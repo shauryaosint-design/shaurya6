@@ -1,0 +1,252 @@
+// MPGI ERP - Prisma Schema
+// Multi-tenant ready for Maharana Pratap Group of Institutions
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Campus {
+  id          String   @id @default(cuid())
+  code        String   @unique // e.g. MANDHANA, BITHOOR
+  name        String
+  address     String?
+  city        String?
+  state       String   @default("Uttar Pradesh")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  colleges    College[]
+  users       User[]
+}
+
+model College {
+  id          String   @id @default(cuid())
+  code        String   @unique // MPGI046, MPGI200 etc.
+  name        String
+  shortName   String?
+  aktuCode    String?
+  bteCode     String?
+  campusId    String
+  campus      Campus   @relation(fields: [campusId], references: [id])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  departments Department[]
+  programs    Program[]
+  students    Student[]
+  users       User[]
+  feeStructures FeeStructure[]
+}
+
+model Department {
+  id          String   @id @default(cuid())
+  code        String
+  name        String
+  collegeId   String
+  college     College  @relation(fields: [collegeId], references: [id])
+  programs    Program[]
+  faculty     Faculty[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([collegeId, code])
+}
+
+model Program {
+  id          String   @id @default(cuid())
+  code        String
+  name        String
+  level       String   // UG, PG, Diploma, PhD
+  durationYrs Int      @default(4)
+  totalSeats  Int?
+  collegeId   String
+  college     College  @relation(fields: [collegeId], references: [id])
+  departmentId String?
+  department  Department? @relation(fields: [departmentId], references: [id])
+  students    Student[]
+  feeStructures FeeStructure[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([collegeId, code])
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  role          String   // SUPER_ADMIN, GROUP_ADMIN, COLLEGE_ADMIN, FACULTY, STUDENT, PARENT, FINANCE, PLACEMENT
+  phone         String?
+  isActive      Boolean  @default(true)
+  campusId      String?
+  campus        Campus?  @relation(fields: [campusId], references: [id])
+  collegeId     String?
+  college       College? @relation(fields: [collegeId], references: [id])
+  student       Student?
+  faculty       Faculty?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastLoginAt   DateTime?
+}
+
+model Student {
+  id            String   @id @default(cuid())
+  enrollmentNo  String   @unique
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+  collegeId     String
+  college       College  @relation(fields: [collegeId], references: [id])
+  programId     String
+  program       Program  @relation(fields: [programId], references: [id])
+  admissionYear Int
+  currentSem    Int      @default(1)
+  status        String   @default("ACTIVE") // ACTIVE, PASSED_OUT, DROPPED, SUSPENDED
+  dateOfBirth   DateTime?
+  gender        String?
+  category      String?  // GEN, OBC, SC, ST, EWS
+  aadhaarMasked String?
+  address       String?
+  city          String?
+  state         String?
+  pincode       String?
+  guardianName  String?
+  guardianPhone String?
+  bloodGroup    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  attendances   Attendance[]
+  feePayments   FeePayment[]
+  marks         Mark[]
+}
+
+model Faculty {
+  id            String   @id @default(cuid())
+  employeeId    String   @unique
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id])
+  designation   String?
+  joiningDate   DateTime?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model FeeStructure {
+  id            String   @id @default(cuid())
+  name          String
+  collegeId     String
+  college       College  @relation(fields: [collegeId], references: [id])
+  programId     String?
+  program       Program? @relation(fields: [programId], references: [id])
+  academicYear  String   // 2025-26
+  semester      Int?
+  tuitionFee    Float    @default(0)
+  developmentFee Float   @default(0)
+  examFee       Float    @default(0)
+  otherFee      Float    @default(0)
+  totalFee      Float
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  payments      FeePayment[]
+}
+
+model FeePayment {
+  id            String   @id @default(cuid())
+  receiptNo     String   @unique
+  studentId     String
+  student       Student  @relation(fields: [studentId], references: [id])
+  feeStructureId String?
+  feeStructure  FeeStructure? @relation(fields: [feeStructureId], references: [id])
+  amount        Float
+  paidAmount    Float
+  dueAmount     Float    @default(0)
+  paymentMode   String   // UPI, CASH, CARD, NETBANKING, CHEQUE
+  transactionId String?
+  status        String   @default("PAID") // PAID, PARTIAL, PENDING, FAILED
+  paidAt        DateTime @default(now())
+  remarks       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Attendance {
+  id            String   @id @default(cuid())
+  studentId     String
+  student       Student  @relation(fields: [studentId], references: [id])
+  date          DateTime
+  status        String   // PRESENT, ABSENT, LATE, LEAVE, HOLIDAY
+  subjectCode   String?
+  period        Int?
+  markedBy      String?
+  remarks       String?
+  createdAt     DateTime @default(now())
+
+  @@unique([studentId, date, subjectCode, period])
+  @@index([studentId, date])
+}
+
+model Subject {
+  id            String   @id @default(cuid())
+  code          String
+  name          String
+  credits       Int      @default(3)
+  semester      Int
+  programId     String?
+  createdAt     DateTime @default(now())
+  marks         Mark[]
+}
+
+model Mark {
+  id            String   @id @default(cuid())
+  studentId     String
+  student       Student  @relation(fields: [studentId], references: [id])
+  subjectId     String
+  subject       Subject  @relation(fields: [subjectId], references: [id])
+  examType      String   // MID, END, INTERNAL, PRACTICAL
+  maxMarks      Float
+  obtained      Float
+  academicYear  String
+  semester      Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([studentId, subjectId, examType, academicYear, semester])
+}
+
+model AdmissionEnquiry {
+  id            String   @id @default(cuid())
+  fullName      String
+  email         String?
+  phone         String
+  programInterest String?
+  collegeCode   String?
+  source        String?  // WEBSITE, WALKIN, REFERRAL, SOCIAL
+  status        String   @default("NEW") // NEW, CONTACTED, COUNSELING, ADMITTED, REJECTED, LOST
+  remarks       String?
+  assignedTo    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Announcement {
+  id            String   @id @default(cuid())
+  title         String
+  content       String
+  targetRole    String?  // ALL, STUDENT, FACULTY, PARENT
+  collegeId     String?
+  isPinned      Boolean  @default(false)
+  publishedAt   DateTime @default(now())
+  expiresAt     DateTime?
+  createdBy     String?
+  createdAt     DateTime @default(now())
+}
